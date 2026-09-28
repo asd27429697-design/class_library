@@ -67,8 +67,10 @@ public class LibraryView2 {
                         borrowBook();
                         break;
                     case 5:
+                        returnBook();
                         break;
                     case 6:
+                        addBook();
                         break;
                     case 0:
                         System.out.println("도서 관리 프로그램을 종료합니다");
@@ -176,7 +178,7 @@ public class LibraryView2 {
     // 4. 도서 대출
     private void borrowBook() throws SQLException {
         if (currentStudent == null) {
-            throw new SQLException("도서를 대출 할려면 먼저 로그인을 하세요");
+            throw new SQLException(" 도서를 대출 할려면 먼저 로그인을 하세요");
         }
         System.out.println("대출할 도서의 id를 입력하세요");
 
@@ -186,7 +188,44 @@ public class LibraryView2 {
     }
 
     // 5.  도서 반납
-    
+    private void returnBook() throws SQLException {
+        if (currentStudent == null) {
+            throw new SQLException("도서 반납을 하려면 먼저 로그인을 하세요");
+        }
+        System.out.println("반납할 도서의 id를 입력하세요");
+        int bookId = Integer.parseInt(scanner.nextLine().trim());
+        libraryService.returnBook(bookId, currentStudent.getId());
+        System.out.println("도서 반납이 완료되었습니다");
+    }
+
+    // 6.  도서 등록
+    private void addBook() throws SQLException {
+        System.out.println("=== 신규 도서 등록 ===");
+        System.out.print("도서 제목: ");
+        String title = scanner.nextLine().trim();
+        System.out.print("저자 이름: ");
+        String author = scanner.nextLine().trim();
+        System.out.print("출판사: ");
+        String publisher = scanner.nextLine().trim();
+        System.out.print("출판년도: ");
+        int year = Integer.parseInt(scanner.nextLine().trim());
+        System.out.print("ISBN: ");
+        String isbn = scanner.nextLine().trim();
+
+        Book book = Book.builder()
+                .title(title)
+                .author(author)
+                .publisher(publisher)
+                .publicationYear(year)
+                .isbn(isbn)
+                .build();
+        libraryService.addBook(book);
+        System.out.println("새로운 도서가 등록되었습니다");
+    }
+
+
+
+
 
     // 해당 기능을 각각에 메서드로 설계
 

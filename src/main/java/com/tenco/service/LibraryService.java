@@ -2,13 +2,19 @@ package com.tenco.service;
 
 // 비즈니스 로직을 처리하는 클래스
 
+import com.tenco.dao.AdminDAO;
 import com.tenco.dao.BookDAO;
 import com.tenco.dao.BorrowDAO;
 import com.tenco.dao.StudentDAO;
+import com.tenco.dto.Admin;
 import com.tenco.dto.Book;
 import com.tenco.dto.Borrow;
 import com.tenco.dto.Student;
+import com.tenco.util.DatabaseUtil;
+import org.mindrot.jbcrypt.BCrypt;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -21,13 +27,14 @@ public class LibraryService {
     private final BookDAO bookDAO = new BookDAO();
     private final StudentDAO studentDAO = new StudentDAO();
     private final BorrowDAO borrowDAO = new BorrowDAO();
+    private final AdminDAO adminDAO = new AdminDAO();
 
     // 도서 추가 기능
     // 1. 제목과 저자가 비어 있는지 확인 (둘 중 하나라도 없으면 중단)
     // 2. 통과하면 DAO에 INSERT 처리를 위임한다.
     public void addBook(Book book) throws SQLException{
         if (book.getTitle() == null || book.getTitle().trim().isEmpty() ||
-        book.getAuthor() == null || book.getAuthor().trim().isEmpty()) {
+                book.getAuthor() == null || book.getAuthor().trim().isEmpty()) {
             throw new SQLException("도서 제목과 저자는 필수 입력 항목입니다");
         }
         // 위임 처리
@@ -56,7 +63,7 @@ public class LibraryService {
     //    유니크 걸려있는 student_id 는 DB에서 확인해야 함으로 여기서는 먼저 중복 검사를 안할 예정.
     public void addStudent(Student student) throws SQLException {
         if (student.getName() == null || student.getName().trim().isEmpty() ||
-        student.getStudentId() == null || student.getStudentId().trim().isEmpty()) {
+                student.getStudentId() == null || student.getStudentId().trim().isEmpty()) {
             throw new SQLException("이름과 학번은 필수 입력 항목입니다");
         }
         studentDAO.addStudent(student);
@@ -103,12 +110,65 @@ public class LibraryService {
         borrowDAO.returnBook(bookId, studentId);
     }
 
+
+    // 관리자 로그인 (ID 와 비밀번호 확인)
+    // 1. ID 와 비밀번호가 비어 있지 않은지 검사
+    // 2. DAO 에서 해당 ID 의 관리자를 찾는다 (없으면 null)
+    // 3. 입력한 비밀번호와 DB 에 저장된 비밀번호를 비교한다
+    // 4. 일치하면 비밀번호를 지운 Admin 을, 아니면 null 을 View 에 돌려준다
+    //
+    // 비교를 SQL 이 아니라 여기서 하는 이유:
+    // "비밀번호가 맞는가" 는 업무 규칙이고, 해시를 도입하면 3번 한 줄만 바뀝니다.
+    // View 가 "ID 가 틀렸는지 비밀번호가 틀렸는지" 를 구분할 수 없게 null 하나로 돌려주는 것도 의도입니다.
+    // 어느 쪽이 틀렸는지 알려 주면 공격자가 ID 존재 여부를 알아낼 수 있기 때문입니다.
+    public Admin authenticateAdmin(String adminId, String password) throws SQLException {
+        if (adminId == null || adminId.trim().isEmpty() ||
+                password == null || password.isEmpty()) {
+            throw new SQLException("관리자 ID 와 비밀번호를 입력해주세요.");
+        }
+
+        Admin admin = adminDAO.findByAdminId(adminId);
+        if (admin == null) {
+            return null;
+        }
+
+        // 입력한 비밀번호를 DB의 해시값과 비교
+        // checkpw가 해시값 앞 부분에서 솔트와 비용을 읽어 같은 조건으로 다시 계산한 뒤 비교처리 합니다.
+        if (!BCrypt.checkpw(password, admin.getPassword())) {
+            return null;
+        }
+
+        // 인증이 끝난 객체에 비밀번호를 남겨 둘 이유가 없으므로 지우고 돌려줍니다.
+        admin.setPassword(null);
+        return admin;
+    }
+
+    // 관리자 등록
+    public void registerAdmin(String adminId, String password, String name) throws SQLException {
+        if (adminId == null || adminId.trim().isEmpty() ||
+                password == null || password.trim().isEmpty() ||
+                name == null || name.trim().isEmpty()) {
+
+            throw new SQLException("관리자 ID, 비밀번호, 이름은 필수 입력 항목입니다");
+        }
+
+        // 솔트 : 10, 해시 처리
+        String hashed = BCrypt.hashpw(password, BCrypt.gensalt(10));
+        Admin admin = Admin.builder()
+                .adminId(adminId.trim())
+                .password(hashed)
+                .name(name.trim())
+                .build();
+
+        adminDAO.addAdmin(admin);
+    }
+
+
+
+    public static void main(String[] args) throws SQLException {
+        LibraryService libraryService =  new LibraryService();
+        libraryService.registerAdmin("amdin10", "1234", "김관리");
+
+    }
+
 }
-
-
-
-
-
-
-
-
